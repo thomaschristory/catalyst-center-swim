@@ -1,0 +1,49 @@
+meta {
+  name: Get image by name
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/dna/intent/api/v1/image/importation?name={{imageName}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  name: {{imageName}}
+}
+
+script:post-response {
+  const list = (res.getBody() || {}).response || [];
+  if (list.length > 0) {
+    const img = list[0];
+    bru.setVar("imageUuid", img.imageUuid);
+    bru.setVar("imageVersion", img.version);
+    const fam = (img.applicableDevicesForImage || [])[0];
+    if (fam && fam.mdfId) {
+      bru.setVar("deviceFamilyId", fam.mdfId);
+    }
+    console.log(`image ${img.name} uuid=${img.imageUuid} version=${img.version} family=${img.family} golden=${img.isTaggedGolden} integrity=${img.imageIntegrityStatus}`);
+    console.log("applicable products:", JSON.stringify((img.applicableDevicesForImage || []).map(p => ({ mdfId: p.mdfId, productName: p.productName }))));
+  }
+}
+
+tests {
+  test("status 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("image found in repository", function () {
+    expect(res.getBody().response.length).to.be.greaterThan(0);
+  });
+}
+
+docs {
+  Classic image repository lookup. Sets `imageUuid`, `imageVersion` and `deviceFamilyId`
+  (first entry of `applicableDevicesForImage[].mdfId`, used for golden tagging).
+
+  If the image applies to several product families, check the console output and set
+  `deviceFamilyId` by hand to the one matching your device.
+
+  Other useful filters: `version`, `family`, `isTaggedGolden=true`, `imageIntegrityStatus=VERIFIED`.
+}

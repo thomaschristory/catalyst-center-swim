@@ -1,0 +1,31 @@
+meta {
+  name: Get device version
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/dna/intent/api/v1/network-device/{{deviceUuid}}
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  const d = (res.getBody() || {}).response || {};
+  console.log(`before=${bru.getVar("deviceCurrentVersion")} now=${d.softwareVersion} target=${bru.getVar("imageVersion")} collection=${d.collectionStatus} uptime=${d.upTime}`);
+}
+
+tests {
+  const d = res.getBody().response || {};
+  test("status 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("running the target version", function () {
+    expect(d.softwareVersion).to.equal(bru.getVar("imageVersion"));
+  });
+}
+
+docs {
+  Compares the device's `softwareVersion` with `imageVersion` from "Get image by name".
+  The version strings can differ in format (for example 17.12.04 vs 17.12.4); check the console line if the test fails.
+}

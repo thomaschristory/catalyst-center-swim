@@ -1,0 +1,22 @@
+meta {
+  name: Get golden tag status
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/dna/intent/api/v1/image/importation/golden/site/{{siteId}}/family/{{deviceFamilyId}}/role/{{deviceRole}}/image/{{imageUuid}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("status 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  Shows whether the image is golden for this site / family / role, and whether it is inherited from a parent site.
+  The same path with DELETE removes the golden tag.
+}

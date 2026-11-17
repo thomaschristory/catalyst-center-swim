@@ -1,0 +1,46 @@
+meta {
+  name: Import image from URL
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/dna/intent/api/v1/image/importation/source/url
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  [
+    {
+      "sourceURL": "{{imageUrl}}",
+      "thirdParty": false
+    }
+  ]
+}
+
+script:post-response {
+  const r = (res.getBody() || {}).response;
+  if (r && r.taskId) {
+    bru.setVar("taskId", r.taskId);
+  }
+}
+
+tests {
+  test("accepted", function () {
+    expect([200, 202]).to.include(res.getStatus());
+  });
+  test("taskId returned", function () {
+    expect(res.getBody().response.taskId).to.be.a("string");
+  });
+}
+
+docs {
+  Pulls the image from an HTTP/FTP server reachable from Catalyst Center. Async: poll with
+  "06 Tasks / Get task" until `endTime` is set, then re-run "Get image by name".
+  Skip this if the image is already in the repository.
+}

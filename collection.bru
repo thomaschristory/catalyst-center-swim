@@ -1,0 +1,30 @@
+auth {
+  mode: apikey
+}
+
+auth:apikey {
+  key: X-Auth-Token
+  value: {{token}}
+  placement: header
+}
+
+docs {
+  # Catalyst Center SWIM (2.3.7.x)
+
+  Classic SWIM flow over the Intent API, with a port maintenance window around the reload:
+  token > find device and image > (import) > (golden) > snapshot + shut ports > distribute > activate >
+  poll task > verify > re-enable ports > check.
+
+  Every request except "Get token" inherits the X-Auth-Token header from this collection.
+  Run "01 Auth / Get token" first; it stores `token` as a runtime variable (valid about 60 min).
+
+  Runtime variables set by scripts: `token`, `deviceUuid`, `deviceCurrentVersion`, `imageUuid`,
+  `imageVersion`, `deviceFamilyId`, `taskId`.
+
+  Port runtime variables: `portQueue`, `currentPortId`, `currentPortName`, `fileId`.
+  The pre-change port state is kept in the environment variable `portSnapshot`.
+
+  Safety switches (environment):
+  - `allowPortChanges: true` is needed for the shut / no shut requests.
+  - `allowActivation: true` is needed for activation, which reloads the device.
+}

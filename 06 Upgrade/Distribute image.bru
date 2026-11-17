@@ -1,0 +1,57 @@
+meta {
+  name: Distribute image
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/dna/intent/api/v1/image/distribution
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  [
+    {
+      "deviceUuid": "{{deviceUuid}}",
+      "imageUuid": "{{imageUuid}}"
+    }
+  ]
+}
+
+script:pre-request {
+  for (const v of ["deviceUuid", "imageUuid"]) {
+    if (!bru.getVar(v)) {
+      throw new Error(`${v} is not set: run the 02 Discovery requests first.`);
+    }
+  }
+}
+
+script:post-response {
+  const r = (res.getBody() || {}).response;
+  if (r && r.taskId) {
+    bru.setVar("taskId", r.taskId);
+  }
+}
+
+tests {
+  test("accepted", function () {
+    expect([200, 202]).to.include(res.getStatus());
+  });
+  test("taskId returned", function () {
+    expect(res.getBody().response.taskId).to.be.a("string");
+  });
+}
+
+docs {
+  Copies the image to the device flash. No reload. Runs the distribution pre-checks
+  (flash space, reachability, config-register and so on). If the image is already on flash the step
+  completes quickly as a no-op.
+
+  The body is a list: add more {deviceUuid, imageUuid} objects to distribute to several devices in one task.
+  Poll with "06 Tasks / Get task" and check per-device results with "Get task tree".
+}

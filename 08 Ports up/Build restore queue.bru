@@ -1,0 +1,61 @@
+meta {
+  name: Build restore queue
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/dna/intent/api/v1/interface/network-device/{{deviceUuid}}
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  let snap = null;
+  try { snap = JSON.parse(bru.getEnvVar("portSnapshot") || "null"); } catch (e) { snap = null; }
+  const all = (res.getBody() || {}).response || [];
+  const byName = Object.fromEntries(all.map(i => [i.portName, i]));
+
+  bru.setVar("restoreProblem", "");
+  if (!snap || !Array.isArray(snap.ports)) {
+    bru.setVar("restoreProblem", "no portSnapshot in environment");
+  } else if (snap.deviceUuid !== bru.getVar("deviceUuid")) {
+    bru.setVar("restoreProblem", `snapshot belongs to ${snap.hostname}, not the current device`);
+  }
+
+  if (!bru.getVar("restoreProblem")) {
+    // Re-resolve interface ids by name after the reload; only ports that were UP before the change.
+    const toRestore = snap.ports.filter(p => p.adminStatus === "UP");
+    const missing = toRestore.filter(p => !byName[p.name]).map(p => p.name);
+    const queue = toRestore
+      .filter(p => byName[p.name] && byName[p.name].adminStatus !== "UP")
+      .map(p => ({ id: byName[p.name].id, name: p.name }));
+    bru.setVar("portQueue", JSON.stringify(queue));
+    bru.setVar("portsMissing", JSON.stringify(missing));
+    for (const p of snap.ports) {
+      const now = byName[p.name];
+      console.log(`${p.name.padEnd(28)} before=${p.adminStatus} now=${now ? now.adminStatus : "MISSING"}`);
+    }
+    console.log(`${queue.length} port(s) queued for no shutdown`);
+  }
+}
+
+tests {
+  test("status 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("snapshot usable", function () {
+    expect(bru.getVar("restoreProblem")).to.equal("");
+  });
+  test("all snapshot ports found", function () {
+    expect(JSON.parse(bru.getVar("portsMissing") || "[]")).to.deep.equal([]);
+  });
+}
+
+docs {
+  Run after the upgrade, once the device is reachable and resynced ("07 Verify / Resync device").
+
+  Reads `portSnapshot` and queues only the ports that were admin UP before the change.
+  Interface ids are resolved again by name, in case inventory rebuilt them after the reload.
+  Ports that already show UP are skipped.
+}

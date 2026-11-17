@@ -1,0 +1,32 @@
+meta {
+  name: List imported images (new API)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/dna/intent/api/v1/images?imported=true&name={{imageName}}&limit=50
+  body: none
+  auth: inherit
+}
+
+params:query {
+  imported: true
+  name: {{imageName}}
+  limit: 50
+}
+
+tests {
+  test("status 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  Newer image API (2.3.7.6 and later). Returns golden status per site, recommended/latest flags
+  and add-on (SMU/subpackage) info. Informational only here: its `id` is the same image identifier,
+  but the classic distribute/activate calls in this collection use `imageUuid` from "Get image by name".
+
+  Drop `imported=true` (or set it to false) to see images Catalyst Center knows about from Cisco.com
+  but has not downloaded.
+}

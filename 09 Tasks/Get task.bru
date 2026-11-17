@@ -1,0 +1,44 @@
+meta {
+  name: Get task
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/dna/intent/api/v1/task/{{taskId}}
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  const t = (res.getBody() || {}).response || {};
+  const state = t.endTime ? (t.isError ? "FAILED" : "DONE") : "RUNNING";
+  console.log(`task ${t.id} ${state} progress="${t.progress}"` + (t.failureReason ? ` failure="${t.failureReason}"` : ""));
+  // Command Runner tasks put {"fileId": "..."} in progress once finished.
+  try {
+    const p = JSON.parse(t.progress);
+    if (p && p.fileId) {
+      bru.setVar("fileId", p.fileId);
+      console.log(`fileId=${p.fileId}: run "10 Checks / Get command output"`);
+    }
+  } catch (e) {}
+}
+
+tests {
+  const t = res.getBody().response || {};
+  test("status 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("task finished (endTime set), re-send if this fails", function () {
+    expect(t.endTime).to.exist;
+  });
+  test("task has no error", function () {
+    expect(t.isError).to.equal(false);
+  });
+}
+
+docs {
+  Uses the last `taskId` stored by any POST in this collection. Re-send until the "finished" test passes.
+  Do not judge success from `progress`: it is free text. Use `endTime` and `isError`, then check
+  per-device results with "Get task tree" when the job covered several devices.
+}

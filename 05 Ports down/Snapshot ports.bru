@@ -1,0 +1,77 @@
+meta {
+  name: Snapshot ports
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/dna/intent/api/v1/interface/network-device/{{deviceUuid}}
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  const wanted = String(bru.getEnvVar("ports") || "").split(",").map(s => s.trim()).filter(Boolean);
+  const all = (res.getBody() || {}).response || [];
+  const byName = Object.fromEntries(all.map(i => [i.portName, i]));
+  const deviceUuid = bru.getVar("deviceUuid");
+
+  let existing = null;
+  try { existing = JSON.parse(bru.getEnvVar("portSnapshot") || "null"); } catch (e) { existing = null; }
+
+  let snapshot;
+  if (existing && existing.deviceUuid === deviceUuid && Array.isArray(existing.ports) && existing.ports.length) {
+    snapshot = existing;
+    console.log(`Keeping existing snapshot taken ${existing.takenAt}. Clear portSnapshot in the environment to retake it.`);
+  } else {
+    snapshot = {
+      deviceUuid,
+      hostname: bru.getEnvVar("hostname"),
+      takenAt: new Date().toISOString(),
+      ports: wanted.filter(n => byName[n]).map(n => ({
+        name: n,
+        adminStatus: byName[n].adminStatus,
+        operStatus: byName[n].status,
+        description: byName[n].description || ""
+      }))
+    };
+    const json = JSON.stringify(snapshot);
+    try { bru.setEnvVar("portSnapshot", json, { persist: true }); } catch (e) { bru.setEnvVar("portSnapshot", json); }
+  }
+
+  // Only shut ports that were admin UP before the change; ports already down are left alone.
+  const queue = snapshot.ports
+    .filter(p => p.adminStatus === "UP" && byName[p.name] && byName[p.name].adminStatus === "UP")
+    .map(p => ({ id: byName[p.name].id, name: p.name }));
+  bru.setVar("portQueue", JSON.stringify(queue));
+  bru.setVar("portsMissing", JSON.stringify(wanted.filter(n => !byName[n])));
+
+  for (const p of snapshot.ports) {
+    console.log(`${p.name.padEnd(28)} admin=${p.adminStatus} oper=${p.operStatus} "${p.description}"`);
+  }
+  console.log(`${queue.length} port(s) queued for shutdown`);
+}
+
+tests {
+  test("status 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("ports variable is set", function () {
+    expect(String(bru.getEnvVar("ports") || "").trim()).to.not.equal("");
+  });
+  test("all requested ports exist on the device", function () {
+    expect(JSON.parse(bru.getVar("portsMissing"))).to.deep.equal([]);
+  });
+}
+
+docs {
+  Reads the device's interfaces, records the admin/oper state of the ports listed in the `ports` environment
+  variable (comma-separated full names, for example `GigabitEthernet1/0/1,TenGigabitEthernet1/1/1`),
+  and builds the shutdown queue.
+
+  The snapshot is stored in the environment variable `portSnapshot` (persisted where your Bruno version supports it),
+  so it survives the reload window. Only ports that were admin UP are shut, and only those are re-enabled later.
+
+  Re-running it is safe: an existing snapshot for the same device is kept, so a second run after the shutdown
+  does not record the ports as "originally down". Clear `portSnapshot` before working on the next change.
+}

@@ -1,0 +1,44 @@
+meta {
+  name: Run show commands
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/dna/intent/api/v1/network-device-poller/cli/read-request
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "swim-port-check",
+    "commands": [
+      "show interfaces status",
+      "show running-config"
+    ],
+    "deviceUuids": ["{{deviceUuid}}"]
+  }
+}
+
+script:post-response {
+  const r = (res.getBody() || {}).response;
+  if (r && r.taskId) {
+    bru.setVar("taskId", r.taskId);
+  }
+}
+
+tests {
+  test("accepted", function () {
+    expect([200, 202]).to.include(res.getStatus());
+  });
+}
+
+docs {
+  Command Runner (read-only commands). Edit the command list as needed.
+  Then run "09 Tasks / Get task" until finished (it extracts `fileId`), then "Get command output".
+}

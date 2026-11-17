@@ -1,0 +1,6 @@
+{
+  "version": "1",
+  "name": "Catalyst Center SWIM",
+  "type": "collection",
+  "ignore": ["node_modules", ".git"]
+}

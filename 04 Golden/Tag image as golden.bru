@@ -1,0 +1,45 @@
+meta {
+  name: Tag image as golden
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/dna/intent/api/v1/image/importation/golden
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "imageId": "{{imageUuid}}",
+    "siteId": "{{siteId}}",
+    "deviceRole": "{{deviceRole}}",
+    "deviceFamilyIdentifier": "{{deviceFamilyId}}"
+  }
+}
+
+script:post-response {
+  const r = (res.getBody() || {}).response;
+  if (r && r.taskId) {
+    bru.setVar("taskId", r.taskId);
+  }
+}
+
+tests {
+  test("accepted", function () {
+    expect([200, 202]).to.include(res.getStatus());
+  });
+}
+
+docs {
+  Optional. Golden tagging drives image compliance and the UI's outdated-device view; distribution and
+  activation do not require it.
+
+  `siteId` -1 means Global. `deviceRole`: ALL, ACCESS, DISTRIBUTION, CORE, BORDER ROUTER, UNKNOWN.
+  `deviceFamilyId` comes from "Get image by name" (mdfId of the product family).
+}

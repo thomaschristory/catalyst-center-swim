@@ -1,0 +1,34 @@
+meta {
+  name: Resync device
+  type: http
+  seq: 1
+}
+
+put {
+  url: {{baseUrl}}/dna/intent/api/v1/network-device/sync?forceSync=true
+  body: json
+  auth: inherit
+}
+
+params:query {
+  forceSync: true
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  ["{{deviceUuid}}"]
+}
+
+tests {
+  test("accepted", function () {
+    expect([200, 202]).to.include(res.getStatus());
+  });
+}
+
+docs {
+  Forces an inventory resync so `softwareVersion` reflects the new image without waiting for the periodic collection.
+  Give it a few minutes, then run "Get device version".
+}

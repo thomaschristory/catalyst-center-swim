@@ -1,0 +1,71 @@
+meta {
+  name: Enable next port
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/dna/intent/api/v1/interface/{{currentPortId}}?deploymentMode=Deploy
+  body: json
+  auth: inherit
+}
+
+params:query {
+  deploymentMode: Deploy
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "adminStatus": "UP"
+  }
+}
+
+script:pre-request {
+  if (String(bru.getEnvVar("allowPortChanges")) !== "true") {
+    throw new Error("Port changes blocked: set allowPortChanges to true in the environment.");
+  }
+  const q = JSON.parse(bru.getVar("portQueue") || "[]");
+  if (!q.length) {
+    throw new Error("Port queue is empty: run 'Build restore queue' first, or every port is already done.");
+  }
+  bru.setVar("currentPortId", q[0].id);
+  bru.setVar("currentPortName", q[0].name);
+}
+
+script:post-response {
+  const r = (res.getBody() || {}).response || {};
+  if (r.taskId) bru.setVar("taskId", r.taskId);
+  if ([200, 202].includes(res.getStatus())) {
+    const q = JSON.parse(bru.getVar("portQueue") || "[]");
+    q.shift();
+    bru.setVar("portQueue", JSON.stringify(q));
+    console.log(`${bru.getVar("currentPortName")}: UP requested (task ${r.taskId}), ${q.length} left`);
+    if (q.length) {
+      await bru.sleep(Number(bru.getEnvVar("portStepDelayMs") || 5000));
+      try {
+        if (bru.runner && typeof bru.runner.setNextRequest === "function") bru.runner.setNextRequest("Enable next port");
+        else if (typeof bru.setNextRequest === "function") bru.setNextRequest("Enable next port");
+      } catch (e) {}
+    }
+  }
+}
+
+tests {
+  test("accepted", function () {
+    expect([200, 202]).to.include(res.getStatus());
+  });
+  test("queue empty (re-send until this passes)", function () {
+    expect(JSON.parse(bru.getVar("portQueue") || "[]")).to.have.lengthOf(0);
+  });
+}
+
+docs {
+  Sets the next queued port back to admin UP. Same mechanics as "Shutdown next port":
+  re-send until the queue is empty, or run the folder in the Runner.
+
+  When all ports are back and checked, clear `portSnapshot` in the environment before the next change.
+}

@@ -1,0 +1,25 @@
+meta {
+  name: Get image compliance
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/dna/intent/api/v1/compliance/{{deviceUuid}}/detail?complianceType=IMAGE
+  body: none
+  auth: inherit
+}
+
+params:query {
+  complianceType: IMAGE
+}
+
+tests {
+  test("status 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  IMAGE compliance detail for the device: COMPLIANT when it runs the golden image for its site / family / role.
+}

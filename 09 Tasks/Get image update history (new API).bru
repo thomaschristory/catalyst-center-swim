@@ -1,0 +1,28 @@
+meta {
+  name: Get image update history (new API)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/dna/intent/api/v1/networkDeviceImageUpdates?networkDeviceId={{deviceUuid}}&limit=20
+  body: none
+  auth: inherit
+}
+
+params:query {
+  networkDeviceId: {{deviceUuid}}
+  limit: 20
+}
+
+tests {
+  test("status 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  Per-device history of DISTRIBUTION and ACTIVATE operations with status (SUCCESS, FAILURE, IN-PROGRESS, PENDING).
+  Documented for 2.3.7.9 and later; if your cluster returns 404, it is not exposed on your build.
+  Other filters: `parentId` (a taskId), `status`, `hostName`, `managementAddress`, `imageName`.
+}

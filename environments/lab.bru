@@ -1,0 +1,17 @@
+vars {
+  baseUrl: https://catalyst-center.example.local
+  username: apiuser
+  hostname: lab-sw01
+  imageName: cat9k_iosxe.17.12.04.SPA.bin
+  imageUrl: http://fileserver.example.local/images/cat9k_iosxe.17.12.04.SPA.bin
+  siteId: -1
+  deviceRole: ALL
+  ports: GigabitEthernet1/0/1,GigabitEthernet1/0/2
+  portStepDelayMs: 5000
+  portSnapshot:
+  allowPortChanges: false
+  allowActivation: false
+}
+vars:secret [
+  password
+]

@@ -1,0 +1,76 @@
+meta {
+  name: Activate image (RELOADS DEVICE)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/dna/intent/api/v1/image/activation/device?scheduleValidate=false
+  body: json
+  auth: inherit
+}
+
+params:query {
+  scheduleValidate: false
+}
+
+headers {
+  Content-Type: application/json
+  Client-Type: bruno
+  Client-Url: bruno
+}
+
+body:json {
+  [
+    {
+      "deviceUuid": "{{deviceUuid}}",
+      "imageUuidList": ["{{imageUuid}}"],
+      "smuImageUuidList": [],
+      "distributeIfNeeded": false,
+      "activateLowerImageVersion": false,
+      "deviceUpgradeMode": "currentlyExists"
+    }
+  ]
+}
+
+script:pre-request {
+  if (String(bru.getEnvVar("allowActivation")) !== "true") {
+    throw new Error("Activation blocked: set allowActivation to true in the environment. This request reloads the device.");
+  }
+  for (const v of ["deviceUuid", "imageUuid"]) {
+    if (!bru.getVar(v)) {
+      throw new Error(`${v} is not set: run the 02 Discovery requests first.`);
+    }
+  }
+}
+
+script:post-response {
+  const r = (res.getBody() || {}).response;
+  if (r && r.taskId) {
+    bru.setVar("taskId", r.taskId);
+  }
+}
+
+tests {
+  test("accepted", function () {
+    expect([200, 202]).to.include(res.getStatus());
+  });
+  test("taskId returned", function () {
+    expect(res.getBody().response.taskId).to.be.a("string");
+  });
+}
+
+docs {
+  Activates the image and reloads the device.
+
+  Safety: blocked unless the environment has `allowActivation: true`. Set it back to false afterwards.
+
+  Fields:
+  - `distributeIfNeeded`: true lets one call do distribute + activate. Left false so the copy stays a separate step.
+  - `activateLowerImageVersion`: must be true for a downgrade.
+  - `deviceUpgradeMode`: `currentlyExists` keeps the current boot mode (install or bundle).
+  - `smuImageUuidList`: SMUs to activate together with the base image.
+
+  Client-Type and Client-Url headers: some releases reject activation without them; the values are free text.
+  Expect 15 to 30+ minutes for a task to finish (reload plus post-checks), longer for stacks.
+}

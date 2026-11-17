@@ -1,0 +1,40 @@
+meta {
+  name: Get device by hostname
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/dna/intent/api/v1/network-device?hostname={{hostname}}
+  body: none
+  auth: inherit
+}
+
+params:query {
+  hostname: {{hostname}}
+}
+
+script:post-response {
+  const list = (res.getBody() || {}).response || [];
+  if (list.length > 0) {
+    const d = list[0];
+    bru.setVar("deviceUuid", d.id);
+    bru.setVar("deviceCurrentVersion", d.softwareVersion);
+    console.log(`device ${d.hostname} id=${d.id} platform=${d.platformId} version=${d.softwareVersion} series=${d.series}`);
+  }
+}
+
+tests {
+  test("status 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("exactly one device matched", function () {
+    expect(res.getBody().response).to.have.lengthOf(1);
+  });
+}
+
+docs {
+  Looks up the device by exact hostname (as known to Catalyst Center, usually the FQDN if the device has a domain name set).
+  Sets `deviceUuid` and `deviceCurrentVersion`.
+  Swap the filter for `managementIpAddress` if that is easier.
+}

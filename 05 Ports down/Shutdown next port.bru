@@ -1,0 +1,74 @@
+meta {
+  name: Shutdown next port
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/dna/intent/api/v1/interface/{{currentPortId}}?deploymentMode=Deploy
+  body: json
+  auth: inherit
+}
+
+params:query {
+  deploymentMode: Deploy
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "adminStatus": "DOWN"
+  }
+}
+
+script:pre-request {
+  if (String(bru.getEnvVar("allowPortChanges")) !== "true") {
+    throw new Error("Port changes blocked: set allowPortChanges to true in the environment.");
+  }
+  const q = JSON.parse(bru.getVar("portQueue") || "[]");
+  if (!q.length) {
+    throw new Error("Port queue is empty: run 'Snapshot ports' first, or every port is already done.");
+  }
+  bru.setVar("currentPortId", q[0].id);
+  bru.setVar("currentPortName", q[0].name);
+}
+
+script:post-response {
+  const r = (res.getBody() || {}).response || {};
+  if (r.taskId) bru.setVar("taskId", r.taskId);
+  if ([200, 202].includes(res.getStatus())) {
+    const q = JSON.parse(bru.getVar("portQueue") || "[]");
+    q.shift();
+    bru.setVar("portQueue", JSON.stringify(q));
+    console.log(`${bru.getVar("currentPortName")}: DOWN requested (task ${r.taskId}), ${q.length} left`);
+    if (q.length) {
+      await bru.sleep(Number(bru.getEnvVar("portStepDelayMs") || 5000));
+      try {
+        if (bru.runner && typeof bru.runner.setNextRequest === "function") bru.runner.setNextRequest("Shutdown next port");
+        else if (typeof bru.setNextRequest === "function") bru.setNextRequest("Shutdown next port");
+      } catch (e) {}
+    }
+  }
+}
+
+tests {
+  test("accepted", function () {
+    expect([200, 202]).to.include(res.getStatus());
+  });
+  test("queue empty (re-send until this passes)", function () {
+    expect(JSON.parse(bru.getVar("portQueue") || "[]")).to.have.lengthOf(0);
+  });
+}
+
+docs {
+  Sets the next queued port to admin DOWN. One port per send: click Send until the "queue empty" test passes,
+  or run the "05 Ports down" folder in the Runner, which loops on its own.
+
+  Blocked unless the environment has `allowPortChanges: true`.
+
+  Each call is its own Catalyst Center task. If one fails, check it with "09 Tasks / Get task"
+  (it holds the last taskId), then confirm the result with "10 Checks".
+}

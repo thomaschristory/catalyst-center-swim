@@ -1,0 +1,40 @@
+meta {
+  name: Run image compliance
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/dna/intent/api/v1/compliance/
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "triggerFull": false,
+    "categories": ["IMAGE"],
+    "deviceUuids": ["{{deviceUuid}}"]
+  }
+}
+
+script:post-response {
+  const r = (res.getBody() || {}).response;
+  if (r && r.taskId) {
+    bru.setVar("taskId", r.taskId);
+  }
+}
+
+tests {
+  test("accepted", function () {
+    expect([200, 202]).to.include(res.getStatus());
+  });
+}
+
+docs {
+  Re-runs the IMAGE compliance check for the device. Only meaningful if a golden image is tagged for its site / family / role.
+}

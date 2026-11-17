@@ -1,0 +1,37 @@
+meta {
+  name: Import image from file
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/dna/intent/api/v1/image/importation/source/file?isThirdParty=false
+  body: multipartForm
+  auth: inherit
+}
+
+params:query {
+  isThirdParty: false
+}
+
+body:multipart-form {
+  file: @file(/path/to/cat9k_iosxe.17.12.04.SPA.bin)
+}
+
+script:post-response {
+  const r = (res.getBody() || {}).response;
+  if (r && r.taskId) {
+    bru.setVar("taskId", r.taskId);
+  }
+}
+
+tests {
+  test("accepted", function () {
+    expect([200, 202]).to.include(res.getStatus());
+  });
+}
+
+docs {
+  Uploads a local image file. Edit the `@file(...)` path in the Body tab first.
+  Large uploads (1 GB+) are slow through Bruno; the URL import is usually the better option.
+}

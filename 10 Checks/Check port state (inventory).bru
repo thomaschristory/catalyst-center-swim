@@ -1,0 +1,32 @@
+meta {
+  name: Check port state (inventory)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/dna/intent/api/v1/interface/network-device/{{deviceUuid}}
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  const wanted = String(bru.getEnvVar("ports") || "").split(",").map(s => s.trim()).filter(Boolean);
+  const all = (res.getBody() || {}).response || [];
+  const byName = Object.fromEntries(all.map(i => [i.portName, i]));
+  for (const n of wanted) {
+    const i = byName[n];
+    console.log(`${n.padEnd(28)} ` + (i ? `admin=${i.adminStatus} oper=${i.status} lastUpdated=${i.lastUpdated}` : "NOT FOUND"));
+  }
+}
+
+tests {
+  test("status 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  Catalyst Center's view of the ports in `ports`. It can lag behind the device until the next resync,
+  so use "Run show commands" for the device's actual state.
+}

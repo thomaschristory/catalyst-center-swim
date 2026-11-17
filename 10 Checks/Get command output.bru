@@ -1,0 +1,38 @@
+meta {
+  name: Get command output
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/dna/intent/api/v1/file/{{fileId}}
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  const body = res.getBody();
+  const items = Array.isArray(body) ? body : [];
+  for (const dev of items) {
+    const cr = dev.commandResponses || {};
+    for (const [cmd, out] of Object.entries(cr.SUCCESS || {})) {
+      console.log(`===== ${cmd} =====\n${out}`);
+    }
+    for (const bucket of ["FAILURE", "BLACKLISTED"]) {
+      for (const [cmd, out] of Object.entries(cr[bucket] || {})) {
+        console.log(`===== ${cmd} (${bucket}) =====\n${out}`);
+      }
+    }
+  }
+}
+
+tests {
+  test("status 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  Prints each command's output to the console tab. `fileId` is set by "09 Tasks / Get task"
+  when it reads a finished Command Runner task.
+}
